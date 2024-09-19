@@ -7,7 +7,18 @@ const app = express();
 app.use(bodyParser.json());
 
 const token = process.env.BOT_TOKEN;
-const bot = new TelegramBot(token, { polling: true });
+const url = process.env.APP_URL;
+
+const bot = new TelegramBot(token);
+
+// Configuration du webhook
+bot.setWebHook(`${url}/bot${token}`);
+
+// Gestion des mises à jour via webhook
+app.post(`/bot${token}`, (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
 
 // Map pour stocker les associations code -> chatId
 const userCodes = new Map();
