@@ -15,9 +15,10 @@ const bot = new TelegramBot(token);
 async function setupWebhook() {
   try {
     const webhookInfo = await bot.getWebHookInfo();
+    console.log("Webhook actuel:", webhookInfo);
     if (webhookInfo.url !== `${url}/bot${token}`) {
       await bot.setWebHook(`${url}/bot${token}`);
-      console.log("Webhook configuré avec succès");
+      console.log("Webhook configuré avec succès:", `${url}/bot${token}`);
     } else {
       console.log("Webhook déjà correctement configuré");
     }
@@ -30,6 +31,7 @@ setupWebhook();
 
 // Gestion des mises à jour via webhook
 app.post(`/bot${token}`, (req, res) => {
+  console.log("Mise à jour reçue:", JSON.stringify(req.body));
   bot.processUpdate(req.body);
   res.sendStatus(200);
 });
@@ -42,11 +44,15 @@ const userStates = new Map();
 // Gestion de la commande /start
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
+  console.log(`Commande /start reçue du chat ID: ${chatId}`);
   userStates.set(chatId, "WAITING_FOR_CODE");
   bot
     .sendMessage(
       chatId,
       "Bienvenue ! Veuillez entrer le code à 6 chiffres généré par l'application."
+    )
+    .then(() =>
+      console.log(`Message de bienvenue envoyé au chat ID: ${chatId}`)
     )
     .catch((error) =>
       console.error("Erreur lors de l'envoi du message de bienvenue:", error)
@@ -56,11 +62,15 @@ bot.onText(/\/start/, (msg) => {
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
   const messageText = msg.text;
+  console.log(`Message reçu du chat ID ${chatId}: ${messageText}`);
 
-  // Ignorer la commande /start ici car elle est déjà gérée
-  if (messageText === "/start") return;
+  if (messageText === "/start") {
+    console.log("Commande /start ignorée car déjà gérée");
+    return;
+  }
 
   const userState = userStates.get(chatId);
+  console.log(`État actuel de l'utilisateur ${chatId}: ${userState}`);
 
   if (userState === "WAITING_FOR_CODE") {
     if (messageText && messageText.length === 6 && /^\d+$/.test(messageText)) {
@@ -71,6 +81,7 @@ bot.on("message", (msg) => {
           chatId,
           "Code validé ! Vous recevrez maintenant des notifications."
         )
+        .then(() => console.log(`Code validé pour le chat ID: ${chatId}`))
         .catch((error) =>
           console.error(
             "Erreur lors de l'envoi du message de validation:",
@@ -83,6 +94,9 @@ bot.on("message", (msg) => {
           chatId,
           "Le code doit être composé de 6 chiffres. Veuillez réessayer."
         )
+        .then(() =>
+          console.log(`Message d'erreur envoyé au chat ID: ${chatId}`)
+        )
         .catch((error) =>
           console.error("Erreur lors de l'envoi du message d'erreur:", error)
         );
@@ -93,6 +107,7 @@ bot.on("message", (msg) => {
         chatId,
         "Pour commencer, veuillez utiliser la commande /start."
       )
+      .then(() => console.log(`Instructions envoyées au chat ID: ${chatId}`))
       .catch((error) =>
         console.error(
           "Erreur lors de l'envoi du message d'instructions:",
@@ -104,17 +119,24 @@ bot.on("message", (msg) => {
 
 app.post("/send-notification", (req, res) => {
   const { code, message } = req.body;
+  console.log(
+    `Tentative d'envoi de notification. Code: ${code}, Message: ${message}`
+  );
 
   if (userCodes.has(code)) {
     const chatId = userCodes.get(code);
     bot
       .sendMessage(chatId, message)
-      .then(() => res.status(200).send("Notification envoyée avec succès"))
+      .then(() => {
+        console.log(`Notification envoyée avec succès au chat ID: ${chatId}`);
+        res.status(200).send("Notification envoyée avec succès");
+      })
       .catch((error) => {
         console.error("Erreur lors de l'envoi de la notification:", error);
         res.status(500).send("Erreur lors de l'envoi de la notification");
       });
   } else {
+    console.log(`Code non trouvé: ${code}`);
     res.status(404).send("Code non trouvé");
   }
 });
@@ -131,6 +153,9 @@ process.on("unhandledRejection", (reason, promise) => {
 
 // Gestion des erreurs pour Express
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error("Erreur Express:", err.stack);
   res.status(500).send("Something broke!");
 });
+
+// Vérification périodique du webhook
+setInterval(setupWebhook, 1000 * 60 * 60); // Vérifie toutes les heures
