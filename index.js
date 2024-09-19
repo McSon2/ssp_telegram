@@ -26,7 +26,6 @@ async function setupWebhook() {
   }
 }
 
-// Appel de la fonction de configuration du webhook
 setupWebhook();
 
 // Gestion des mises à jour via webhook
@@ -37,29 +36,68 @@ app.post(`/bot${token}`, (req, res) => {
 
 // Map pour stocker les associations code -> chatId
 const userCodes = new Map();
+// Map pour suivre l'état de la conversation de chaque utilisateur
+const userStates = new Map();
+
+// Gestion de la commande /start
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  userStates.set(chatId, "WAITING_FOR_CODE");
+  bot
+    .sendMessage(
+      chatId,
+      "Bienvenue ! Veuillez entrer le code à 6 chiffres généré par l'application."
+    )
+    .catch((error) =>
+      console.error("Erreur lors de l'envoi du message de bienvenue:", error)
+    );
+});
 
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
   const messageText = msg.text;
 
-  if (messageText && messageText.length === 6) {
-    userCodes.set(messageText, chatId);
-    bot
-      .sendMessage(
-        chatId,
-        "Code validé ! Vous recevrez maintenant des notifications."
-      )
-      .catch((error) =>
-        console.error("Erreur lors de l'envoi du message:", error)
-      );
+  // Ignorer la commande /start ici car elle est déjà gérée
+  if (messageText === "/start") return;
+
+  const userState = userStates.get(chatId);
+
+  if (userState === "WAITING_FOR_CODE") {
+    if (messageText && messageText.length === 6 && /^\d+$/.test(messageText)) {
+      userCodes.set(messageText, chatId);
+      userStates.set(chatId, "CODE_VALIDATED");
+      bot
+        .sendMessage(
+          chatId,
+          "Code validé ! Vous recevrez maintenant des notifications."
+        )
+        .catch((error) =>
+          console.error(
+            "Erreur lors de l'envoi du message de validation:",
+            error
+          )
+        );
+    } else {
+      bot
+        .sendMessage(
+          chatId,
+          "Le code doit être composé de 6 chiffres. Veuillez réessayer."
+        )
+        .catch((error) =>
+          console.error("Erreur lors de l'envoi du message d'erreur:", error)
+        );
+    }
   } else {
     bot
       .sendMessage(
         chatId,
-        "Veuillez entrer le code à 6 chiffres généré par l'application."
+        "Pour commencer, veuillez utiliser la commande /start."
       )
       .catch((error) =>
-        console.error("Erreur lors de l'envoi du message:", error)
+        console.error(
+          "Erreur lors de l'envoi du message d'instructions:",
+          error
+        )
       );
   }
 });
@@ -89,7 +127,6 @@ app.listen(PORT, () => {
 // Gestion globale des erreurs non gérées
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
-  // Application specific logging, throwing an error, or other logic here
 });
 
 // Gestion des erreurs pour Express
