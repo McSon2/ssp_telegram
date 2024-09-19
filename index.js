@@ -1,10 +1,10 @@
 require("dotenv").config();
-import TelegramBot from "node-telegram-bot-api";
-import express from "express";
-import { json } from "body-parser";
+const TelegramBot = require("node-telegram-bot-api");
+const express = require("express");
+const bodyParser = require("body-parser");
 
 const app = express();
-app.use(json());
+app.use(bodyParser.json());
 
 const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
