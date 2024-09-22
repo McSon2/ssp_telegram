@@ -4,7 +4,6 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const { TelegramClient } = require("telegram");
 const { StringSession } = require("telegram/sessions");
-const input = require("input"); // Pour gérer les entrées utilisateur si nécessaire
 const WebSocket = require("ws"); // Pour le serveur WebSocket
 
 const app = express();
