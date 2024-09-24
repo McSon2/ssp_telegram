@@ -25,12 +25,12 @@ const bot = new TelegramBot(token);
 async function setupWebhook() {
   try {
     const webhookInfo = await bot.getWebHookInfo();
-    console.log("Webhook actuel:", webhookInfo);
+    //console.log("Webhook actuel:", webhookInfo);
     if (webhookInfo.url !== `${url}/bot${token}`) {
       await bot.setWebHook(`${url}/bot${token}`);
-      console.log("Webhook configuré avec succès:", `${url}/bot${token}`);
+      //console.log("Webhook configuré avec succès:", `${url}/bot${token}`);
     } else {
-      console.log("Webhook déjà correctement configuré");
+      //console.log("Webhook déjà correctement configuré");
     }
   } catch (error) {
     console.error("Erreur lors de la configuration du webhook:", error);
@@ -156,11 +156,11 @@ const wss = new WebSocket.Server({ noServer: true });
 const connectedClients = new Set();
 
 wss.on("connection", (ws) => {
-  console.log("Nouvelle connexion WebSocket");
+  //console.log("Nouvelle connexion WebSocket");
   connectedClients.add(ws);
 
   ws.on("close", () => {
-    console.log("Connexion WebSocket fermée");
+    //console.log("Connexion WebSocket fermée");
     connectedClients.delete(ws);
   });
 });
@@ -183,11 +183,13 @@ server.on("upgrade", (request, socket, head) => {
 });
 
 // Initialiser Telegram et écouter le canal
-const channelUsername = "@stakebonusdrops"; // Remplacez par le nom d'utilisateur du canal que vous souhaitez écouter
-//stakebonusdrops
-//ssptestcode
+const channelUsernames = [
+  "@stakebonusdrops",
+  "@BonusDropStake",
+  "@ssptestcode",
+];
 initializeTelegram().then(() => {
-  listenToChannel(channelUsername);
+  listenToChannels(channelUsernames);
 });
 
 // Fonction pour initialiser la connexion Telegram
@@ -212,7 +214,7 @@ async function initializeTelegram() {
 }
 
 // Fonction pour écouter les messages du canal spécifié
-async function listenToChannel(channelUsername) {
+async function listenToChannels(channelUsernames) {
   if (!telegramInitialized) {
     await initializeTelegram();
   }
@@ -222,7 +224,9 @@ async function listenToChannel(channelUsername) {
     return;
   }
 
-  console.log(`Écoute des messages du canal : ${channelUsername}`);
+  console.log(
+    `Écoute des messages des canaux : ${channelUsernames.join(", ")}`
+  );
 
   const { NewMessage } = require("telegram/events");
 
@@ -230,10 +234,16 @@ async function listenToChannel(channelUsername) {
     const message = event.message;
     if (message && message.peerId) {
       const sender = await telegramClient.getEntity(message.peerId);
-      if (sender.username === channelUsername.replace("@", "")) {
+      const senderUsername = sender.username || sender.title; // Pour les canaux sans nom d'utilisateur
+      if (
+        senderUsername &&
+        channelUsernames
+          .map((username) => username.replace("@", ""))
+          .includes(senderUsername)
+      ) {
         const messageText = message.message;
         console.log(
-          `Nouveau message reçu du canal ${channelUsername}: ${messageText}`
+          `Nouveau message reçu du canal @${senderUsername}: ${messageText}`
         );
 
         // Envoyer le message aux clients WebSocket
@@ -241,6 +251,7 @@ async function listenToChannel(channelUsername) {
           text: messageText,
           from: sender,
           date: message.date,
+          channel: senderUsername, // Ajout du nom du canal au message
         };
 
         connectedClients.forEach((client) => {
