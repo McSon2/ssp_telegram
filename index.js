@@ -183,8 +183,9 @@ server.on("upgrade", (request, socket, head) => {
 });
 
 // Initialiser Telegram et écouter le canal
-const channelUsername = "@stakebonusdrops"; // Remplacez par le nom d'utilisateur du canal que vous souhaitez écouter
-
+const channelUsername = "@ssptestcode"; // Remplacez par le nom d'utilisateur du canal que vous souhaitez écouter
+//stakebonusdrops
+//ssptestcode
 initializeTelegram().then(() => {
   listenToChannel(channelUsername);
 });
