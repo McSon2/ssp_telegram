@@ -2,9 +2,6 @@ require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
 const express = require("express");
 const bodyParser = require("body-parser");
-const { TelegramClient } = require("telegram");
-const { StringSession } = require("telegram/sessions");
-const WebSocket = require("ws"); // Pour le serveur WebSocket
 
 const app = express();
 app.use(bodyParser.json());
@@ -12,25 +9,14 @@ app.use(bodyParser.json());
 const token = process.env.BOT_TOKEN;
 const url = process.env.APP_URL;
 
-const apiId = parseInt(process.env.TELEGRAM_API_ID, 10);
-const apiHash = process.env.TELEGRAM_API_HASH;
-const sessionString = process.env.TELEGRAM_SESSION; // Chaîne de session pré-générée
-
-let telegramClient;
-let telegramInitialized = false;
-
 const bot = new TelegramBot(token);
 
 // Configuration du webhook avec gestion d'erreur
 async function setupWebhook() {
   try {
     const webhookInfo = await bot.getWebHookInfo();
-    //console.log("Webhook actuel:", webhookInfo);
     if (webhookInfo.url !== `${url}/bot${token}`) {
       await bot.setWebHook(`${url}/bot${token}`);
-      //console.log("Webhook configuré avec succès:", `${url}/bot${token}`);
-    } else {
-      //console.log("Webhook déjà correctement configuré");
     }
   } catch (error) {
     console.error("Erreur lors de la configuration du webhook:", error);
@@ -151,118 +137,10 @@ app.post("/send-notification", (req, res) => {
   }
 });
 
-// Serveur WebSocket
-const wss = new WebSocket.Server({ noServer: true });
-const connectedClients = new Set();
-
-wss.on("connection", (ws) => {
-  //console.log("Nouvelle connexion WebSocket");
-  connectedClients.add(ws);
-
-  ws.on("close", () => {
-    //console.log("Connexion WebSocket fermée");
-    connectedClients.delete(ws);
-  });
-});
-
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => {
   console.log(`Serveur en écoute sur le port ${PORT}`);
 });
-
-server.on("upgrade", (request, socket, head) => {
-  const pathname = request.url;
-
-  if (pathname === "/ws") {
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit("connection", ws, request);
-    });
-  } else {
-    socket.destroy();
-  }
-});
-
-// Initialiser Telegram et écouter le canal
-const channelUsernames = [
-  "@stakebonusdrops",
-  "@BonusDropStake",
-  "@ssptestcode",
-];
-initializeTelegram().then(() => {
-  listenToChannels(channelUsernames);
-});
-
-// Fonction pour initialiser la connexion Telegram
-async function initializeTelegram() {
-  console.log("Initialisation de Telegram...");
-  telegramClient = new TelegramClient(
-    new StringSession(sessionString),
-    apiId,
-    apiHash,
-    {
-      connectionRetries: 5,
-    }
-  );
-  try {
-    await telegramClient.connect();
-    console.log("Vous êtes connecté à Telegram avec la session pré-générée.");
-    telegramInitialized = true;
-  } catch (error) {
-    console.error("Erreur lors de la connexion à Telegram :", error);
-    telegramInitialized = false;
-  }
-}
-
-// Fonction pour écouter les messages du canal spécifié
-async function listenToChannels(channelUsernames) {
-  if (!telegramInitialized) {
-    await initializeTelegram();
-  }
-
-  if (!telegramInitialized) {
-    console.error("Impossible d'initialiser Telegram. Vérifiez votre session.");
-    return;
-  }
-
-  console.log(
-    `Écoute des messages des canaux : ${channelUsernames.join(", ")}`
-  );
-
-  const { NewMessage } = require("telegram/events");
-
-  telegramClient.addEventHandler(async (event) => {
-    const message = event.message;
-    if (message && message.peerId) {
-      const sender = await telegramClient.getEntity(message.peerId);
-      const senderUsername = sender.username || sender.title; // Pour les canaux sans nom d'utilisateur
-      if (
-        senderUsername &&
-        channelUsernames
-          .map((username) => username.replace("@", ""))
-          .includes(senderUsername)
-      ) {
-        const messageText = message.message;
-        console.log(
-          `Nouveau message reçu du canal @${senderUsername}: ${messageText}`
-        );
-
-        // Envoyer le message aux clients WebSocket
-        const messageData = {
-          text: messageText,
-          from: sender,
-          date: message.date,
-          channel: senderUsername, // Ajout du nom du canal au message
-        };
-
-        connectedClients.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(messageData));
-          }
-        });
-      }
-    }
-  }, new NewMessage({}));
-}
 
 // Gestion globale des erreurs non gérées
 process.on("unhandledRejection", (reason, promise) => {
