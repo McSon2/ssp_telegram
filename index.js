@@ -13,7 +13,7 @@ const url = process.env.APP_URL;
 const bot = new TelegramBot(token);
 
 // Configuration du client Redis
-const redis = new Redis(process.env.REDIS_URL);
+const redis = new Redis(process.env.REDIS_URL + "?family=0");
 
 // Configuration du webhook avec gestion d'erreur
 async function setupWebhook() {
