@@ -3,6 +3,7 @@ const TelegramBot = require("node-telegram-bot-api");
 const express = require("express");
 const bodyParser = require("body-parser");
 const Redis = require("ioredis");
+const httpProxy = require("http-proxy");
 
 const app = express();
 app.use(bodyParser.json());
@@ -132,6 +133,22 @@ app.post("/send-notification", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => {
   console.log(`Serveur en écoute sur le port ${PORT}`);
+});
+
+// Créer un proxy pour transférer les connexions WebSocket
+const proxy = httpProxy.createProxyServer({
+  target: "wss://sspcodeclaim-production.up.railway.app",
+  ws: true,
+  changeOrigin: true,
+});
+
+// Gérer les connexions WebSocket entrantes
+server.on("upgrade", function (req, socket, head) {
+  if (req.url === "/ws") {
+    proxy.ws(req, socket, head);
+  } else {
+    socket.destroy();
+  }
 });
 
 // Gestion globale des erreurs non gérées
