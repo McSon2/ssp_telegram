@@ -113,6 +113,8 @@ bot.on("message", async (msg) => {
 app.post("/send-notification", async (req, res) => {
   const { code, message } = req.body;
 
+  console.log("message envoyé :", message);
+
   const chatId = await redis.get(`code:${code}`);
   if (chatId) {
     bot
