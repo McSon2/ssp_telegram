@@ -22,6 +22,7 @@ async function setupWebhook() {
     const webhookInfo = await bot.getWebHookInfo();
     if (webhookInfo.url !== `${url}/bot${token}`) {
       await bot.setWebHook(`${url}/bot${token}`);
+      console.log("Webhook configuré avec succès.");
     }
   } catch (error) {
     console.error("Erreur lors de la configuration du webhook:", error);
@@ -40,6 +41,7 @@ app.post(`/bot${token}`, (req, res) => {
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   await redis.set(`userState:${chatId}`, "WAITING_FOR_CODE");
+  console.log(`Utilisateur ${chatId} a démarré une session avec /start.`);
   bot
     .sendMessage(
       chatId,
@@ -67,12 +69,15 @@ bot.on("message", async (msg) => {
       if (oldCode) {
         // Supprimer l'ancien code
         await redis.del(`code:${oldCode}`);
+        console.log(`Ancien code ${oldCode} supprimé pour l'utilisateur ${chatId}.`);
       }
 
       // Enregistrer le nouveau code
       await redis.set(`code:${messageText}`, chatId);
       await redis.set(`chatId:${chatId}`, messageText);
       await redis.set(`userState:${chatId}`, "CODE_VALIDATED");
+
+      console.log(`Code ${messageText} associé à l'utilisateur ${chatId}.`);
 
       bot
         .sendMessage(
@@ -113,13 +118,12 @@ bot.on("message", async (msg) => {
 app.post("/send-notification", async (req, res) => {
   const { code, message } = req.body;
 
-  console.log("message envoyé :", message);
-
   const chatId = await redis.get(`code:${code}`);
   if (chatId) {
     bot
       .sendMessage(chatId, message)
       .then(() => {
+        console.log(`Notification envoyée à l'utilisateur ${chatId}.`);
         res.status(200).send("Notification envoyée avec succès");
       })
       .catch((error) => {
@@ -127,7 +131,7 @@ app.post("/send-notification", async (req, res) => {
         res.status(500).send("Erreur lors de l'envoi de la notification");
       });
   } else {
-    console.log(`Code non trouvé: ${code}`);
+    console.log(`Code non trouvé : ${code}`);
     res.status(404).send("Code non trouvé");
   }
 });
@@ -155,13 +159,13 @@ server.on("upgrade", function (req, socket, head) {
 
 // Gestion globale des erreurs non gérées
 process.on("unhandledRejection", (reason, promise) => {
-  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+  console.error("Rejet non géré à :", promise, "raison :", reason);
 });
 
 // Gestion des erreurs pour Express
 app.use((err, req, res, next) => {
-  console.error("Erreur Express:", err.stack);
-  res.status(500).send("Something broke!");
+  console.error("Erreur Express :", err.stack);
+  res.status(500).send("Une erreur est survenue !");
 });
 
 // Vérification périodique du webhook
